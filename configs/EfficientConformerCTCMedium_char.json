@@ -1,14 +1,14 @@
 {
-    "model_name": "Efficient Conformer CTC Large",
+    "model_name": "Efficient Conformer CTC Medium",
     "model_type": "CTC",
 
     "encoder_params": 
     {
         "arch": "Conformer",
         "num_blocks": 16,
-        "dim_model": [360, 512, 720],
+        "dim_model": [180, 256, 360],
         "ff_ratio": 4,
-        "num_heads": 8,
+        "num_heads": 4,
         "kernel_size": 15,
         "Pdrop": 0.1,
         "conv_stride": 2,
@@ -22,7 +22,7 @@
 
         "subsampling_module": "Conv2d",
         "subsampling_layers": 1,
-        "subsampling_filters": [360],
+        "subsampling_filters": [180],
         "subsampling_kernel_size": 3,
         "subsampling_norm": "batch",
         "subsampling_act": "swish",
@@ -39,22 +39,22 @@
         "spec_augment": true,
         "mF": 2,
         "F": 27,
-        "mT": 10,
+        "mT": 5,
         "pS": 0.05
     },
     
     "tokenizer_params":
     {
-        "tokenizer_path": "datasets/LibriSpeech/LibriSpeech_bpe_256.model",
-        "vocab_type": "bpe",
-        "vocab_size": 256
+        "tokenizer_path": "datasets/LibriSpeech/LibriSpeech_char_tokenizer.txt",
+        "vocab_type": "char",
+        "blank_index": 0
     },
 
     "training_params":
     {
         "epochs": 450,
-        "batch_size": 4,
-        "accumulated_steps": 16,
+        "batch_size": 16,
+        "accumulated_steps": 4,
         "mixed_precision": true,
 
         "optimizer": "Adam",
@@ -64,7 +64,7 @@
         "weight_decay": 1e-6,
 
         "lr_schedule": "Transformer",
-        "schedule_dim": 720,
+        "schedule_dim": 360,
         "warmup_steps": 10000,
         "K": 2,
 
@@ -79,7 +79,7 @@
         "evaluation_dataset": "LibriSpeech",
         "evaluation_dataset_path": "datasets/LibriSpeech/",
 
-        "callback_path": "callbacks/EfficientConformerCTCLarge_ft_0.5Prune/"
+        "callback_path": "callbacks/EfficientConformerCTCMedium_char/"
     },
 
     "decoding_params":

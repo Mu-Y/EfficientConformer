@@ -23,6 +23,8 @@ import sentencepiece as spm
 import sys
 import glob
 import os
+import pdb
+from speechbrain.dataio.encoder import CTCTextEncoder
 
 def collate_fn_pad(batch):
 
@@ -34,7 +36,7 @@ def collate_fn_pad(batch):
 
         # Pad data sequences
         data = [item[0].squeeze() for item in sorted_batch]
-        data_lengths = torch.tensor([len(d) for d in data],dtype=torch.long) 
+        data_lengths = torch.tensor([len(d) for d in data],dtype=torch.long)
         data = torch.nn.utils.rnn.pad_sequence(data, batch_first=True, padding_value=0)
 
         # Pad labels
@@ -81,7 +83,20 @@ def create_tokenizer(training_params, tokenizer_params):
 
         # Train Tokenizer
         print("Training Tokenizer")
-        spm.SentencePieceTrainer.train(input=training_params["training_dataset_path"] + training_params["training_dataset"] + "_corpus.txt", model_prefix=tokenizer_params["tokenizer_path"].split(".model")[0], vocab_size=tokenizer_params["vocab_size"], character_coverage=1.0, model_type=tokenizer_params["vocab_type"], bos_id=-1, eos_id=-1, unk_surface="")
+        if tokenizer_params["vocab_type"] == "bpe":
+            spm.SentencePieceTrainer.train(input=training_params["training_dataset_path"] + training_params["training_dataset"] + "_corpus.txt", model_prefix=tokenizer_params["tokenizer_path"].split(".model")[0], vocab_size=tokenizer_params["vocab_size"], character_coverage=1.0, model_type=tokenizer_params["vocab_type"], bos_id=-1, eos_id=-1, unk_surface="")
+        elif tokenizer_params["vocab_type"] == "char":
+            tokenizer = CTCTextEncoder()
+            special_labels = {
+                "blank_label": tokenizer_params["blank_index"],
+            }
+            tokenizer.load_or_create(
+                path=tokenizer_params["tokenizer_path"],
+                from_iterables=[line.strip("\n") for line in open(corpus_path, "r").readlines()],
+                output_key=None,
+                special_labels=special_labels,
+                sequence_input=True,
+            )
         print("Training Done")
 
 def prepare_dataset(training_params, tokenizer_params, tokenizer):
@@ -101,12 +116,46 @@ def prepare_dataset(training_params, tokenizer_params, tokenizer):
         # Save Labels and lengths
         print("Encoding sequences")
         for i, (sentence, label_path) in enumerate(zip(sentences, label_paths)):
-            
+
             # Print
             sys.stdout.write("\r{}/{}".format(i, len(label_paths)))
 
             # Tokenize and Save label
             label = torch.LongTensor(tokenizer.encode(sentence))
+            torch.save(label, label_path)
+
+            # Save Audio length
+            audio_length = torchaudio.load(label_path.split(".")[0] + ".flac")[0].size(1)
+            torch.save(audio_length, label_path.split(".")[0] + ".flac_len")
+
+            # Save Label length
+            label_length = label.size(0)
+            torch.save(label_length, label_path + "_len")
+
+
+def prepare_dataset_char(training_params, tokenizer_params, tokenizer):
+
+    # LibriSpeech Dataset
+    if training_params["training_dataset"] == "LibriSpeech":
+
+        # Read corpus
+        print("Reading Corpus")
+        label_paths = []
+        sentences = []
+        for file_path in glob.glob(training_params["training_dataset_path"] + "*/*/*/*.txt"):
+            for line in open(file_path, "r").readlines():
+                label_paths.append(file_path.replace(file_path.split("/")[-1], "") + line.split()[0] + "." + tokenizer_params["vocab_type"])
+                sentences.append(line[len(line.split()[0]) + 1:-1].lower())
+
+        # Save Labels and lengths
+        print("Encoding sequences")
+        for i, (sentence, label_path) in enumerate(zip(sentences, label_paths)):
+
+            # Print
+            sys.stdout.write("\r{}/{}".format(i, len(label_paths)))
+
+            # Tokenize and Save label
+            label = torch.LongTensor(tokenizer.encode_sequence(sentence))
             torch.save(label, label_path)
 
             # Save Audio length

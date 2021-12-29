@@ -64,15 +64,15 @@ def main(rank, args):
     # Load Model
     if args.initial_epoch is not None:
         ## TODO manually indicate the model path for now
-        # model.load(config["training_params"]["callback_path"] + "checkpoints_" + str(args.initial_epoch) + ".ckpt")
-        model.load("/scratch2/mxy190019/asr-prune/EfficientConformer/callbacks/EfficientConformerCTCLarge/checkpoints_swa-equal-401-450.ckpt")
-        ## TODO to avoid error in the model.fit() function, just manually set initial_epoch to be int 0
-        ## even if the model was loaded from a checkpoint
-        args.initial_epoch = 0
+        model.load(config["training_params"]["callback_path"] + "checkpoints_" + str(args.initial_epoch) + ".ckpt")
+        # model.load("/scratch2/mxy190019/asr-prune/EfficientConformer/callbacks/EfficientConformerCTCLarge/checkpoints_swa-equal-401-450.ckpt")
+        # ## TODO to avoid error in the model.fit() function, just manually set initial_epoch to be int 0
+        # ## even if the model was loaded from a checkpoint
+        # args.initial_epoch = 0
     else:
         args.initial_epoch = 0
-    prune_model(model, 0.5)
-    check_sparsity(model)
+    # prune_model(model, 0.5)
+    # check_sparsity(model)
     # ## after pruning, re-init optimizer, lr_scheduler
     # if config["training_params"]["optimizer"] == "Adam":
     #     # Adam
@@ -130,7 +130,10 @@ def main(rank, args):
 
         if args.rank == 0:
             print("Preparing dataset")
-            prepare_dataset(config["training_params"], config["tokenizer_params"], model.tokenizer)
+            if config["tokenizer_params"]["vocab_type"] == "bpe":
+                prepare_dataset(config["training_params"], config["tokenizer_params"], model.tokenizer)
+            elif config["tokenizer_params"]["vocab_type"] == "char":
+                prepare_dataset_char(config["training_params"], config["tokenizer_params"], model.tokenizer)
 
         if args.distributed:
             torch.distributed.barrier()
@@ -248,7 +251,7 @@ if __name__ == "__main__":
     # Run main
     if args.distributed:
         os.environ['MASTER_ADDR'] = 'localhost'
-        os.environ['MASTER_PORT'] = '8888'
+        os.environ['MASTER_PORT'] = '6666'
         torch.multiprocessing.spawn(main, nprocs=args.world_size, args=(args,))
     else:
         main(0, args)

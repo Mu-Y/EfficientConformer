@@ -36,6 +36,7 @@ from models.attentions import (
     SinusoidalPositionalEncoding,
     StreamingMask
 )
+import pdb
 
 ###############################################################################
 # Encoder Models
@@ -48,7 +49,7 @@ class ConformerEncoder(nn.Module):
 
         # Audio Preprocessing
         self.preprocessing = AudioPreprocessing(params["sample_rate"], params["n_fft"], params["win_length_ms"], params["hop_length_ms"], params["n_mels"], params["normalize"], params["mean"], params["std"])
-        
+
         # Spec Augment
         self.augment = SpecAugment(params["spec_augment"], params["mF"], params["F"], params["mT"], params["pS"])
 
@@ -63,7 +64,7 @@ class ConformerEncoder(nn.Module):
             self.subsampling_module = VGGSubsampling(params["subsampling_layers"], params["subsampling_filters"], params["subsampling_kernel_size"], params["subsampling_norm"], params["subsampling_act"])
         else:
             raise Exception("Unknown subsampling module:", params["subsampling_module"])
-        
+
         # Padding Mask
         self.padding_mask = StreamingMask(left_context=params.get("left_context", params["max_pos_encoding"]), right_context=0 if params.get("causal", False) else params.get("right_context", params["max_pos_encoding"]))
 
@@ -81,13 +82,13 @@ class ConformerEncoder(nn.Module):
             dim_model=params["dim_model"][(block_id > torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["dim_model"], list) else params["dim_model"],
             dim_expand=params["dim_model"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["dim_model"], list) else params["dim_model"],
             ff_ratio=params["ff_ratio"],
-            num_heads=params["num_heads"][(block_id > torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["num_heads"], list) else params["num_heads"], 
-            kernel_size=params["kernel_size"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["kernel_size"], list) else params["kernel_size"], 
+            num_heads=params["num_heads"][(block_id > torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["num_heads"], list) else params["num_heads"],
+            kernel_size=params["kernel_size"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["kernel_size"], list) else params["kernel_size"],
             att_group_size=params["att_group_size"][(block_id > torch.tensor(params.get("strided_blocks", []))).sum()] if isinstance(params.get("att_group_size", 1), list) else params.get("att_group_size", 1),
             att_kernel_size=params["att_kernel_size"][(block_id > torch.tensor(params.get("strided_layers", []))).sum()] if isinstance(params.get("att_kernel_size", None), list) else params.get("att_kernel_size", None),
             linear_att=params.get("linear_att", False),
-            Pdrop=params["Pdrop"], 
-            relative_pos_enc=params["relative_pos_enc"], 
+            Pdrop=params["Pdrop"],
+            relative_pos_enc=params["relative_pos_enc"],
             max_pos_encoding=params["max_pos_encoding"] // params.get("stride", 2)**int((block_id > torch.tensor(params.get("strided_blocks", []))).sum()),
             conv_stride=(params["conv_stride"][(block_id > torch.tensor(params.get("strided_blocks", []))).sum()] if isinstance(params["conv_stride"], list) else params["conv_stride"]) if block_id in params.get("strided_blocks", []) else 1,
             att_stride=(params["att_stride"][(block_id > torch.tensor(params.get("strided_blocks", []))).sum()] if isinstance(params["att_stride"], list) else params["att_stride"]) if block_id in params.get("strided_blocks", []) else 1,
@@ -150,7 +151,7 @@ class ConformerEncoderInterCTC(ConformerEncoder):
         self.interctc_blocks = params["interctc_blocks"]
         for block_id in params["interctc_blocks"]:
             self.__setattr__(
-                name="linear_expand_" + str(block_id), 
+                name="linear_expand_" + str(block_id),
                 value=nn.Linear(
                     in_features=params["dim_model"][(block_id >= torch.tensor(params.get("expand_blocks", []))).sum()] if isinstance(params["dim_model"], list) else params["dim_model"],
                     out_features=params["vocab_size"]))

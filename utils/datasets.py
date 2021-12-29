@@ -24,12 +24,15 @@ import glob
 from tqdm import tqdm
 
 # Librispeech 292.367 samples
-class LibriSpeechDataset(torch.utils.data.Dataset): 
+class LibriSpeechDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path, training_params, tokenizer_params, split, args):
 
         self.names = glob.glob(dataset_path + split + "*/*/*/*.flac")
         self.vocab_type = tokenizer_params["vocab_type"]
-        self.vocab_size = str(tokenizer_params["vocab_size"])
+        if tokenizer_params["vocab_type"] == "bpe":
+            self.vocab_size = str(tokenizer_params["vocab_size"])
+        else:
+            self.vocab_size = None
         self.lm_mode = training_params.get("lm_mode", False)
 
         if split.split("-")[0] == "train":
@@ -42,7 +45,12 @@ class LibriSpeechDataset(torch.utils.data.Dataset):
         if self.lm_mode:
             return [torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
         else:
-            return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
+            ## spm tokenizer
+            if self.vocab_size:
+                return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
+            ## char tokenizer
+            else:
+                return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type)]
 
     def __len__(self):
 
@@ -58,10 +66,15 @@ class LibriSpeechDataset(torch.utils.data.Dataset):
             print("Audio maximum length : {} / Label sequence maximum length : {}".format(audio_max_length, label_max_length))
             self.names = tqdm(self.names)
 
-        return [name for name in self.names if torch.load(name + "_len") <= audio_max_length and torch.load(name.replace("flac", self.vocab_type + "_" + self.vocab_size + "_len")) <= label_max_length]
-            
+        ## spm tokenizer
+        if self.vocab_size:
+            return [name for name in self.names if torch.load(name + "_len") <= audio_max_length and torch.load(name.replace("flac", self.vocab_type + "_" + self.vocab_size + "_len")) <= label_max_length]
+        ## char tokenizer
+        else:
+            return [name for name in self.names if torch.load(name + "_len") <= audio_max_length and torch.load(name.replace("flac", self.vocab_type + "_len")) <= label_max_length]
+
 # Librispeech Corpus 40.418.261 samples
-class LibriSpeechCorpusDataset(torch.utils.data.Dataset): 
+class LibriSpeechCorpusDataset(torch.utils.data.Dataset):
     def __init__(self, dataset_path, training_params, tokenizer_params, split, args):
 
         # Dataset Params

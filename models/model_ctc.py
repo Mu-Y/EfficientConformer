@@ -27,12 +27,14 @@ from models.encoders import (
 
 # Losses
 from models.losses import (
-    LossCTC, 
+    LossCTC,
     LossInterCTC
 )
+from speechbrain.dataio.encoder import CTCTextEncoder
+import pdb
 
-# CTC Decode Beam Search
-from ctcdecode import CTCBeamDecoder
+# # CTC Decode Beam Search
+# from ctcdecode import CTCBeamDecoder
 
 class ModelCTC(Model):
 
@@ -46,7 +48,11 @@ class ModelCTC(Model):
             raise Exception("Unknown encoder architecture:", encoder_params["arch"])
 
         # FC Layer
-        self.fc = nn.Linear(encoder_params["dim_model"][-1] if isinstance(encoder_params["dim_model"], list) else encoder_params["dim_model"], tokenizer_params["vocab_size"])
+        if tokenizer_params["vocab_type"] == "bpe":
+            self.fc = nn.Linear(encoder_params["dim_model"][-1] if isinstance(encoder_params["dim_model"], list) else encoder_params["dim_model"], tokenizer_params["vocab_size"])
+        elif tokenizer_params["vocab_type"] == "char":
+            self.fc = nn.Linear(encoder_params["dim_model"][-1] if isinstance(encoder_params["dim_model"], list) else encoder_params["dim_model"], len(self.tokenizer.lab2ind))
+
 
         # Criterion
         self.criterion = LossCTC()
@@ -125,7 +131,7 @@ class ModelCTC(Model):
                 # New Prediction
                 elif pred_list[-1] != preds[b, t] or blank:
                     pred_list.append(preds[b, t].item())
-                
+
                 # Update Blank
                 blank = False
 
@@ -133,7 +139,13 @@ class ModelCTC(Model):
             batch_pred_list.append(pred_list)
 
         # Decode Sequences
-        return self.tokenizer.decode(batch_pred_list)
+        ## char tokenizer by speechbrain
+        if isinstance(self.tokenizer, CTCTextEncoder):
+            batch_pred_list =  self.tokenizer.decode_ndim(batch_pred_list)
+            return ["".join(pred) for pred in batch_pred_list]
+        ## spm tokenizer
+        else:
+            return self.tokenizer.decode(batch_pred_list)
 
     def beam_search_decoding(self, x, x_len, beam_size=None):
 

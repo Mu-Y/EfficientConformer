@@ -29,6 +29,8 @@ from tqdm import tqdm
 import jiwer
 import os
 import time
+from speechbrain.dataio.encoder import CTCTextEncoder
+import pdb
 
 def sample_synaptic_noise(m, distributed):
 
@@ -46,11 +48,20 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         # Tokenizer
-        try:
-            self.tokenizer = spm.SentencePieceProcessor(tokenizer_params["tokenizer_path"])
-        except:
-            self.tokenizer = None
-            print("Tokenizer not found...")
+        if tokenizer_params["vocab_type"] == "bpe":
+            try:
+                self.tokenizer = spm.SentencePieceProcessor(tokenizer_params["tokenizer_path"])
+            except:
+                self.tokenizer = None
+                print("Tokenizer not found...")
+        elif tokenizer_params["vocab_type"] == "char":
+            try:
+                self.tokenizer = CTCTextEncoder()
+                self.tokenizer.load(tokenizer_params["tokenizer_path"])
+            except:
+                self.tokenizer = None
+                print("Tokenizer not found...")
+
 
         # Training Params
         self.encoder_frozen_steps = training_params.get("encoder_frozen_steps", None)
@@ -86,31 +97,31 @@ class Model(nn.Module):
 
             # Adam
             self.optimizer = optim.Adam(
-                params=self.parameters(), 
-                lr=0, 
-                betas=(training_params["beta1"], training_params["beta2"]), 
-                eps=training_params["eps"], 
+                params=self.parameters(),
+                lr=0,
+                betas=(training_params["beta1"], training_params["beta2"]),
+                eps=training_params["eps"],
                 weight_decay=training_params["weight_decay"])
 
         elif training_params["optimizer"] == "SGD":
 
             # SGD
             self.optimizer = optim.SGD(
-                params=self.parameters, 
-                lr=0, 
-                momentum=training_params["momentum"], 
+                params=self.parameters,
+                lr=0,
+                momentum=training_params["momentum"],
                 weight_decay=training_params["weight_decay"])
 
         # LR Schedulers
         if training_params["lr_schedule"] == "Constant":
-            
+
             # Constant LR
             self.scheduler = constant_learning_rate_scheduler(
                 optimizer=self.optimizer,
                 lr_value=training_params["lr_value"])
 
         elif training_params["lr_schedule"] == "ConstantWithDecay":
-            
+
             # Constant With Decay LR
             self.scheduler = constant_with_decay_learning_rate_scheduler(
                 optimizer=self.optimizer,
@@ -121,29 +132,29 @@ class Model(nn.Module):
 
             # Transformer LR
             self.scheduler = transformer_learning_rate_scheduler(
-                optimizer=self.optimizer, 
-                dim_model=training_params["schedule_dim"], 
-                warmup_steps=training_params["warmup_steps"], 
+                optimizer=self.optimizer,
+                dim_model=training_params["schedule_dim"],
+                warmup_steps=training_params["warmup_steps"],
                 K=training_params["K"])
 
         elif training_params["lr_schedule"] == "ExpDecayTransformer":
 
             # Exp Decay Transformer LR
             self.scheduler = exponential_decay_transformer_learning_rate_scheduler(
-                optimizer=self.optimizer, 
-                warmup_steps=training_params["warmup_steps"], 
-                lr_max=training_params["lr_max"] if training_params.get("lr_max", None) else training_params["K"] * training_params["schedule_dim"]**-0.5 * training_params["warmup_steps"]**-0.5, 
-                alpha=training_params["alpha"], 
+                optimizer=self.optimizer,
+                warmup_steps=training_params["warmup_steps"],
+                lr_max=training_params["lr_max"] if training_params.get("lr_max", None) else training_params["K"] * training_params["schedule_dim"]**-0.5 * training_params["warmup_steps"]**-0.5,
+                alpha=training_params["alpha"],
                 end_step=training_params["end_step"])
 
         elif training_params["lr_schedule"] == "Cosine":
 
             # Cosine Annealing LR
             self.scheduler = cosine_annealing_learning_rate_scheduler(
-                optimizer=self.optimizer, 
-                warmup_steps=training_params["warmup_steps"], 
-                lr_max=training_params["lr_max"] if training_params.get("lr_max", None) else training_params["K"] * training_params["schedule_dim"]**-0.5 * training_params["warmup_steps"]**-0.5, 
-                lr_min= training_params["lr_min"], 
+                optimizer=self.optimizer,
+                warmup_steps=training_params["warmup_steps"],
+                lr_max=training_params["lr_max"] if training_params.get("lr_max", None) else training_params["K"] * training_params["schedule_dim"]**-0.5 * training_params["warmup_steps"]**-0.5,
+                lr_min= training_params["lr_min"],
                 end_step=training_params["end_step"])
 
         # Init LR
@@ -242,6 +253,10 @@ class Model(nn.Module):
                         loss = loss_mini / accumulated_steps
 
                     # Accumulate gradients
+                    if not torch.isfinite(loss):
+                        continue
+                    ## Added the finite check, b/c in char-based CTC, the target sequences are so long
+                    ## that it might be even longer than input sequence, causing loss to be inf
                     scaler.scale(loss).backward()
 
                     # Update Epoch Variables
@@ -344,7 +359,7 @@ class Model(nn.Module):
             raise e
 
     def save(self, path, save_optimizer=True):
-        
+
         # Save Model Checkpoint
         torch.save({
             "model_state_dict": self.state_dict(),
@@ -402,7 +417,7 @@ class Model(nn.Module):
         # tqdm Iterator
         if self.rank == 0:
             eval_iterator = tqdm(dataset_eval, total=eval_steps)
-        else: 
+        else:
             eval_iterator = dataset_eval
 
         # Evaluation Loop
@@ -419,7 +434,13 @@ class Model(nn.Module):
                     outputs_pred = self.gready_search_decoding(batch[0], batch[2])
 
             # Sequence Truth
-            outputs_true = self.tokenizer.decode(batch[1].tolist())
+            ### char tokenizer
+            if isinstance(self.tokenizer, speechbrain.dataio.encoder.CTCTextEncoder):
+                outputs_true = self.tokenizer.decode_ndim(batch[1].tolist())
+                outputs_true = ["".join(true) for true in outputs_true]
+            ### spm tokenizer
+            else:
+                outputs_true = self.tokenizer.decode(batch[1].tolist())
 
             # Compute Batch wer and Update total wer
             batch_wer = jiwer.wer(outputs_true, outputs_pred, standardize=True)
@@ -606,7 +627,7 @@ class Model(nn.Module):
         # tqdm Iterator
         if self.rank == 0:
             eval_iterator = tqdm(dataset_eval, total=eval_steps)
-        else: 
+        else:
             eval_iterator = dataset_eval
 
         # Decoding
@@ -655,7 +676,7 @@ class Model(nn.Module):
         # tqdm Iterator
         if self.rank == 0:
             eval_iterator = tqdm(dataset_eval, total=eval_steps)
-        else: 
+        else:
             eval_iterator = dataset_eval
 
         # Forward
@@ -707,7 +728,7 @@ class Model(nn.Module):
         # tqdm Iterator
         if self.rank == 0:
             eval_iterator = tqdm(dataset_eval, total=eval_steps)
-        else: 
+        else:
             eval_iterator = dataset_eval
 
         # Forward

@@ -16,7 +16,7 @@
 import torch
 
 # Models
-from models.transducer import Transducer
+# from models.transducer import Transducer
 from models.model_ctc import ModelCTC, InterCTC
 from models.lm import LanguageModel
 
@@ -170,7 +170,7 @@ def load_datasets(training_params, tokenizer_params, args):
             sampler = None
 
         dataset_train = torch.utils.data.DataLoader(dataset_train, batch_size=training_params["batch_size"], shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, drop_last=True, sampler=sampler, pin_memory=False)
-        
+
         if args.rank == 0:
             print("Loaded :", dataset_train.dataset.__len__(), "samples", "/", dataset_train.__len__(), "batches")
     else:
@@ -198,7 +198,7 @@ def load_datasets(training_params, tokenizer_params, args):
                     sampler = None
 
                 dataset = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size_eval, shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
-                
+
                 if args.rank == 0:
                     print("Loaded :", dataset.dataset.__len__(), "samples", "/", dataset.__len__(), "batches")
 
@@ -218,10 +218,10 @@ def load_datasets(training_params, tokenizer_params, args):
                 sampler = None
 
             dataset_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size_eval, shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
-            
+
             if args.rank == 0:
                 print("Loaded :", dataset_eval.dataset.__len__(), "samples", "/", dataset_eval.__len__(), "batches")
     else:
         dataset_eval = None
-    
+
     return dataset_train, dataset_eval
