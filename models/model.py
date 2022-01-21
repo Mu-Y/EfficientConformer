@@ -435,7 +435,7 @@ class Model(nn.Module):
 
             # Sequence Truth
             ### char tokenizer
-            if isinstance(self.tokenizer, speechbrain.dataio.encoder.CTCTextEncoder):
+            if isinstance(self.tokenizer, CTCTextEncoder):
                 outputs_true = self.tokenizer.decode_ndim(batch[1].tolist())
                 outputs_true = ["".join(true) for true in outputs_true]
             ### spm tokenizer

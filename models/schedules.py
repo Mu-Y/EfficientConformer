@@ -28,7 +28,7 @@ class constant_learning_rate_scheduler:
         self.lr_value = lr_value
 
     def step(self):
-        
+
         # Update Model Step
         self.model_step += 1
         s = self.model_step + 1
@@ -51,7 +51,7 @@ class constant_with_decay_learning_rate_scheduler:
         self.decay_steps = decay_steps
 
     def step(self):
-        
+
         # Update Model Step
         self.model_step += 1
         s = self.model_step + 1
@@ -82,7 +82,7 @@ class cosine_annealing_learning_rate_scheduler:
         self.end_step = end_step
 
     def step(self):
-        
+
         # Update Model Step
         self.model_step += 1
         s = self.model_step + 1
@@ -112,7 +112,7 @@ class transformer_learning_rate_scheduler:
         self.K = K
 
     def step(self):
-        
+
         # Update Model Step
         self.model_step += 1
         s = self.model_step + 1
@@ -139,7 +139,7 @@ class exponential_decay_transformer_learning_rate_scheduler:
         self.end_step = end_step
 
     def step(self):
-        
+
         # Update Model Step
         self.model_step += 1
         s = self.model_step + 1

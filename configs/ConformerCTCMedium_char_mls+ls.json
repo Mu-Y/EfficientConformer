@@ -39,7 +39,7 @@
     
     "tokenizer_params":
     {
-        "tokenizer_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/LibriSpeech_char_tokenizer.txt",
+        "tokenizer_path": "/mnt/data2/mu/datasets/MLS+LibriSpeech_char_tokenizer.txt",
         "vocab_type": "char",
         "blank_index": 0
     },
@@ -59,7 +59,7 @@
 
         "lr_schedule": "Transformer",
         "schedule_dim": 256,
-        "warmup_steps": 10000,
+        "warmup_steps": 20000,
         "K": 2,
 
         "train_audio_max_length": 256000,
@@ -67,13 +67,19 @@
         "eval_audio_max_length": null,
         "eval_label_max_length": null,
 
-        "training_dataset": "LibriSpeech",
-        "training_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
+        "training_dataset": "MLS+LibriSpeech",
+        "librispeech_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
+        "mls_dataset_path": [
+            "/mnt/data2/mu/datasets/mls_dutch",
+            "/mnt/data2/mu/datasets/mls_french",
+            "/mnt/data2/mu/datasets/mls_spanish",
+            "/mnt/data2/mu/datasets/mls_polish"
+        ],
 
         "evaluation_dataset": "LibriSpeech",
         "evaluation_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
 
-        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_largerBatch_3/"
+        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_largerBatch_largeWarmup/"
     },
 
     "decoding_params":

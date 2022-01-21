@@ -14,6 +14,8 @@
 
 # Pytorch
 import torch
+import random
+import numpy as np
 
 # Functions and Utils
 from functions import *
@@ -26,11 +28,16 @@ import argparse
 import os
 
 import sys
-sys.path.insert(1, "/scratch2/mxy190019/asr-prune")
+# sys.path.insert(1, "/scratch2/mxy190019/asr-prune")
 from prune import prune_model, check_sparsity
 import pdb
 
 def main(rank, args):
+
+    # set random seed for determinism
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     # Process rank
     args.rank = rank
@@ -244,6 +251,7 @@ if __name__ == "__main__":
     parser.add_argument("--saving_period",              type=int,   default=1,                                          help="Model saving every 'n' epochs")
     parser.add_argument("--val_period",                 type=int,   default=1,                                          help="Model validation every 'n' epochs")
     parser.add_argument("--profiler",                   action="store_true",                                            help="Enable eval time profiler")
+    parser.add_argument("--seed", type=int, default=42)
 
     # Parse Args
     args = parser.parse_args()
