@@ -52,6 +52,7 @@
         "batch_size": 16,
         "accumulated_steps": 16,
         "mixed_precision": true,
+        "grad_clip_norm": 10.0,
 
         "optimizer": "Adam",
         "beta1": 0.9,
@@ -70,7 +71,7 @@
         "eval_label_max_length": null,
         "max_hours_per_dataset": 1000,
         "max_seconds_per_utt": 20,
-        "sort_dataset": "ascending",
+        "sort_dataset": null,
 
         "training_dataset": "MLS+LibriSpeech",
         "librispeech_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
@@ -102,7 +103,7 @@
         "multilingual": true,
         "lang2idx": {"english":0, "dutch":1, "french":2, "spanish":3, "polish":4},
 
-        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_mls+ls_ascending/"
+        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_mls+ls_clip/"
     },
 
     "decoding_params":

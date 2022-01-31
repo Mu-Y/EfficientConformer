@@ -181,7 +181,7 @@ class Model(nn.Module):
 
         self.is_parallel = True
 
-    def fit(self, dataset_train, epochs, dataset_val=None, val_steps=None, verbose_val=False, initial_epoch=0, callback_path=None, steps_per_epoch=None, mixed_precision=False, accumulated_steps=1, saving_period=1, val_period=1):
+    def fit(self, dataset_train, epochs, dataset_val=None, val_steps=None, verbose_val=False, initial_epoch=0, callback_path=None, steps_per_epoch=None, mixed_precision=False, accumulated_steps=1, saving_period=1, val_period=1, grad_norm=None):
 
         # Model Device
         device = next(self.parameters()).device
@@ -266,6 +266,12 @@ class Model(nn.Module):
                     # Continue Accumulating
                     if acc_step < accumulated_steps:
                         continue
+
+                    # grad clipping if present
+                    if grad_norm:
+                        # Unscales the gradients of optimizer's assigned params in-place
+                        scaler.unscale_(self.optimizer)
+                        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=grad_norm)
 
                     # Update Parameters, Zero Gradients and Update Learning Rate
                     scaler.step(self.optimizer)

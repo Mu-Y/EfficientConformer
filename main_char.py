@@ -171,7 +171,8 @@ def main(rank, args):
             mixed_precision=config["training_params"]["mixed_precision"],
             accumulated_steps=config["training_params"]["accumulated_steps"],
             saving_period=args.saving_period,
-            val_period=args.val_period)
+            val_period=args.val_period,
+            grad_norm=config["training_params"]["grad_clip_norm"])
 
     # Evaluation
     elif args.mode.split("-")[0] == "validation" or args.mode.split("-")[0] == "test":
