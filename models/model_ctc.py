@@ -63,10 +63,10 @@ class ModelCTC(Model):
     def forward(self, batch):
 
         # Unpack Batch
-        x, _, x_len, _ = batch
+        x, _, x_len, _, langs = batch
 
         # Forward Encoder (B, Taud) -> (B, T, Denc)
-        logits, logits_len, attentions = self.encoder(x, x_len)
+        logits, logits_len, attentions = self.encoder(x, x_len, langs)
 
         # FC Layer (B, T, Denc) -> (B, T, V)
         logits = self.fc(logits)
@@ -93,10 +93,10 @@ class ModelCTC(Model):
         if self.rank == 0:
             print("Model encoder loaded at step {} from {}".format(checkpoint["model_step"], path))
 
-    def gready_search_decoding(self, x, x_len):
+    def gready_search_decoding(self, x, x_len, langs=None):
 
         # Forward Encoder (B, Taud) -> (B, T, Denc)
-        logits, logits_len = self.encoder(x, x_len)[:2]
+        logits, logits_len = self.encoder(x, x_len, langs)[:2]
 
         # FC Layer (B, T, Denc) -> (B, T, V)
         logits = self.fc(logits)

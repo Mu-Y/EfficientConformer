@@ -431,7 +431,7 @@ class Model(nn.Module):
                 if beam_size > 1:
                     outputs_pred = self.beam_search_decoding(batch[0], batch[2], beam_size)
                 else:
-                    outputs_pred = self.gready_search_decoding(batch[0], batch[2])
+                    outputs_pred = self.gready_search_decoding(batch[0], batch[2], batch[4])
 
             # Sequence Truth
             ### char tokenizer

@@ -22,12 +22,40 @@ import sentencepiece as spm
 # Other
 import glob
 from tqdm import tqdm
+import csv
+import pdb
 
 # Librispeech 292.367 samples
 class LibriSpeechDataset(torch.utils.data.Dataset):
-    def __init__(self, dataset_path, training_params, tokenizer_params, split, args):
+    def __init__(self, csv_paths, training_params, tokenizer_params, args, filter_length=True):
 
-        self.names = glob.glob(dataset_path + split + "*/*/*/*.flac")
+        self.max_seconds_per_dataset = training_params["max_hours_per_dataset"] * 3600
+        ## load data from csv file
+        data = {}
+        for csv_path in csv_paths:
+            total_duration = 0.
+            with open(csv_path, newline="") as csvfile:
+                reader = csv.DictReader(csvfile, skipinitialspace=True)
+                for row in reader:
+                    data_id = row["ID"]
+                    if data_id in data:
+                        raise ValueError(f"Duplicate id: {data_id}")
+                    if "duration" in row:
+                        row["duration"] = float(row["duration"])
+                        if filter_length:
+                            if row["duration"] > training_params["max_seconds_per_utt"]:
+                                continue
+                    if "wav_len" in row:
+                        row["wav_len"] = int(row["wav_len"])
+                    if "label_len" in row:
+                        row["label_len"] = int(row["label_len"])
+                    data[data_id] = row
+                    total_duration += row["duration"]
+                    if total_duration > self.max_seconds_per_dataset:
+                        break
+            print("{}: total hours: {}".format(csv_path, total_duration/3600))
+        self.data = [d for _, d in data.items()]
+
         self.vocab_type = tokenizer_params["vocab_type"]
         if tokenizer_params["vocab_type"] == "bpe":
             self.vocab_size = str(tokenizer_params["vocab_size"])
@@ -35,43 +63,54 @@ class LibriSpeechDataset(torch.utils.data.Dataset):
             self.vocab_size = None
         self.lm_mode = training_params.get("lm_mode", False)
 
-        if split.split("-")[0] == "train":
-            self.names = self.filter_lengths(training_params["train_audio_max_length"], training_params["train_label_max_length"], args.rank)
+        # if split.split("-")[0] == "train":
+        #     self.names = self.filter_lengths(training_params["train_audio_max_length"], training_params["train_label_max_length"], args.rank)
+        # else:
+        #     self.names = self.filter_lengths(training_params["eval_audio_max_length"], training_params["eval_audio_max_length"], args.rank)
+        # if filter_length:
+        #     self.data = self.filter_lengths(training_params["train_audio_max_length"],
+        #                                     training_params["train_label_max_length"],
+        #                                     args.rank)
+        if training_params["sort_dataset"] == "ascending":
+            self.data = sorted(self.data, key=lambda x:x["duration"], reverse=False)
+        elif training_params["sort_dataset"] == "descending":
+            self.data = sorted(self.data, key=lambda x:x["duration"], reverse=True)
+
+        if training_params["multilingual"]:
+            self.lang2idx = training_params["lang2idx"]
         else:
-            self.names = self.filter_lengths(training_params["eval_audio_max_length"], training_params["eval_audio_max_length"], args.rank)
+            self.lang2idx = None
+
+
 
     def __getitem__(self, i):
 
         if self.lm_mode:
             return [torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
         else:
-            ## spm tokenizer
-            if self.vocab_size:
-                return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type + "_" + self.vocab_size)]
-            ## char tokenizer
+            if self.lang2idx:
+                return [torchaudio.load(self.data[i]["wav_path"])[0],
+                        torch.load(self.data[i]["tokenized_path"]),
+                        self.lang2idx[self.data[i]["lang"]]]
             else:
-                return [torchaudio.load(self.names[i])[0], torch.load(self.names[i].split(".flac")[0].split("_")[0] + "." + self.vocab_type)]
+                return [torchaudio.load(self.data[i]["wav_path"])[0],
+                        torch.load(self.data[i]["tokenized_path"])]
 
     def __len__(self):
 
-        return len(self.names)
+        return len(self.data)
 
     def filter_lengths(self, audio_max_length, label_max_length, rank=0):
 
         if audio_max_length is None or label_max_length is None:
-            return self.names
+            return self.data
 
         if rank == 0:
-            print("LibriSpeech dataset filtering")
+            print("dataset filtering")
             print("Audio maximum length : {} / Label sequence maximum length : {}".format(audio_max_length, label_max_length))
-            self.names = tqdm(self.names)
+            self.data = tqdm(self.data)
 
-        ## spm tokenizer
-        if self.vocab_size:
-            return [name for name in self.names if torch.load(name + "_len") <= audio_max_length and torch.load(name.replace("flac", self.vocab_type + "_" + self.vocab_size + "_len")) <= label_max_length]
-        ## char tokenizer
-        else:
-            return [name for name in self.names if torch.load(name + "_len") <= audio_max_length and torch.load(name.replace("flac", self.vocab_type + "_len")) <= label_max_length]
+        return [d for d in self.data if d["wav_len"] <= audio_max_length and d["label_len"] <= label_max_length]
 
 # Librispeech Corpus 40.418.261 samples
 class LibriSpeechCorpusDataset(torch.utils.data.Dataset):

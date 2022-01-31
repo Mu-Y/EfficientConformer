@@ -66,14 +66,20 @@
         "train_label_max_length": 256000,
         "eval_audio_max_length": null,
         "eval_label_max_length": null,
+        "sort_dataset": "ascending",
 
-        "training_dataset": "LibriSpeech",
-        "training_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
+        "train_csvs": [
+            "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/train-clean-100.csv",
+            "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/train-clean-360.csv",
+            "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/train-other-500.csv"
+        ],
+        "eval_csvs": [
+            "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/dev-clean.csv",
+            "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/dev-other.csv"
+        ],
 
-        "evaluation_dataset": "LibriSpeech",
-        "evaluation_dataset_path": "/mnt/data2/mu/datasets/Librispeech/LibriSpeech/",
 
-        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_largerBatch_3/"
+        "callback_path": "/mnt/data2/mu/EfficientConformer_results/ConformerCTCMedium_char_ascending/"
     },
 
     "decoding_params":

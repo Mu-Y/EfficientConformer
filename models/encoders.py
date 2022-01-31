@@ -69,7 +69,9 @@ class ConformerEncoder(nn.Module):
         self.padding_mask = StreamingMask(left_context=params.get("left_context", params["max_pos_encoding"]), right_context=0 if params.get("causal", False) else params.get("right_context", params["max_pos_encoding"]))
 
         # Linear Proj
-        self.linear = nn.Linear(params["subsampling_filters"][-1] * params["n_mels"] // 2**params["subsampling_layers"], params["dim_model"][0] if isinstance(params["dim_model"], list) else  params["dim_model"])
+        self.linear = nn.Linear(
+            params["subsampling_filters"][-1] * (1 + (params["n_mels"] + params["lang_emb_dim"]) // 2**params["subsampling_layers"]),
+            params["dim_model"][0] if isinstance(params["dim_model"], list) else  params["dim_model"])
 
         # Dropout
         self.dropout = nn.Dropout(p=params["Pdrop"])
@@ -95,16 +97,27 @@ class ConformerEncoder(nn.Module):
             causal=params.get("causal", False)
         ) for block_id in range(params["num_blocks"])])
 
-    def forward(self, x, x_len=None):
+    def forward(self, x, x_len=None, langs=None):
 
         # Audio Preprocessing
+        ## (B, audio_len) -> (B, num_mel, num_frames)
         x, x_len = self.preprocessing(x, x_len)
 
         # Spec Augment
         if self.training:
             x = self.augment(x, x_len)
 
+        if langs is not None:
+            ## turn int into one-hot
+            langs = langs.unsqueeze(1).expand((-1, x.shape[2])).unsqueeze(1)
+            one_hots = torch.zeros(langs.size(0), 5, langs.size(2)).zero_().cuda()
+            langs = one_hots.scatter_(1, langs.data, 1)
+
+            # concat mel with lang embedding
+            x = torch.cat([x, langs], dim=1)
+
         # Subsampling Module
+        ## (B, n_mel, n_frames) -> (B,  n_cnn_channels * n_mel // n_strides, n_frames // n_strides)
         x, x_len = self.subsampling_module(x, x_len)
 
         # Padding Mask

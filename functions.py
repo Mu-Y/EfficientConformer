@@ -150,78 +150,84 @@ def load_datasets(training_params, tokenizer_params, args):
         }
     }
 
-    # Select Dataset and Split
-    training_dataset = training_datasets[training_params["training_dataset"]]["class"]
-    training_split = training_datasets[training_params["training_dataset"]]["split"][args.mode]
-    evaluation_dataset = evaluation_datasets[training_params["evaluation_dataset"]]["class"]
-    evaluation_split = evaluation_datasets[training_params["evaluation_dataset"]]["split"][args.mode]
+    # # Select Dataset and Split
+    # training_dataset = training_datasets[training_params["training_dataset"]]["class"]
+    # training_split = training_datasets[training_params["training_dataset"]]["split"][args.mode]
+    # evaluation_dataset = evaluation_datasets[training_params["evaluation_dataset"]]["class"]
+    # evaluation_split = evaluation_datasets[training_params["evaluation_dataset"]]["split"][args.mode]
 
     # Training Dataset
-    if training_split:
+    # if training_split:
 
-        if args.rank == 0:
-            print("Loading training dataset : {} {}".format(training_params["training_dataset"], training_split))
+    if args.rank == 0:
+        print("Loading training dataset : {}".format(training_params["train_csvs"]))
 
-        dataset_train =  training_dataset(training_params["training_dataset_path"], training_params, tokenizer_params, training_split, args)
+    dataset_train = LibriSpeechDataset(training_params["train_csvs"], training_params, tokenizer_params,
+                                       args, filter_length=True)
 
-        if args.distributed:
-            sampler = torch.utils.data.distributed.DistributedSampler(dataset_train, num_replicas=args.world_size,rank=args.rank)
-        else:
-            sampler = None
-
-        dataset_train = torch.utils.data.DataLoader(dataset_train, batch_size=training_params["batch_size"], shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, drop_last=True, sampler=sampler, pin_memory=False)
-
-        if args.rank == 0:
-            print("Loaded :", dataset_train.dataset.__len__(), "samples", "/", dataset_train.__len__(), "batches")
+    if args.distributed:
+        sampler = torch.utils.data.distributed.DistributedSampler(dataset_train, num_replicas=args.world_size,rank=args.rank)
     else:
-        dataset_train = None
+        sampler = None
+
+    dataset_train = torch.utils.data.DataLoader(dataset_train, batch_size=training_params["batch_size"],
+                shuffle=((not args.distributed) and (not training_params["sort_dataset"])), num_workers=args.num_workers,
+                collate_fn=collate_fn_pad, drop_last=True, sampler=sampler, pin_memory=False)
+
+    if args.rank == 0:
+        print("Loaded :", dataset_train.dataset.__len__(), "samples", "/", dataset_train.__len__(), "batches")
+    # else:
+    #     dataset_train = None
 
 
     # Evaluation Dataset
-    if  evaluation_split:
+    # if  evaluation_split:
 
-        # Multiple Evaluation datasets
-        if isinstance(evaluation_split, list):
+    # Multiple Evaluation datasets
+    # if isinstance(evaluation_split, list):
 
-            dataset_eval = {}
+    dataset_eval = {}
 
-            for split in evaluation_split:
+    for csv_path in training_params["eval_csvs"]:
 
-                if args.rank == 0:
-                    print("Loading evaluation dataset : {} {}".format(training_params["evaluation_dataset"], split))
+        dataset_name = "/".join(csv_path.split("/")[-2:])
+        if args.rank == 0:
+            print("Loading evaluation dataset : {} ".format(dataset_name))
 
-                dataset = evaluation_dataset(training_params["evaluation_dataset_path"], training_params, tokenizer_params, split, args)
+        dataset = LibriSpeechDataset([csv_path], training_params, tokenizer_params, args, filter_length=False)
 
-                if args.distributed:
-                    sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=args.world_size,rank=args.rank)
-                else:
-                    sampler = None
-
-                dataset = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size_eval, shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
-
-                if args.rank == 0:
-                    print("Loaded :", dataset.dataset.__len__(), "samples", "/", dataset.__len__(), "batches")
-
-                dataset_eval[split] = dataset
-
-        # One Evaluation dataset
+        if args.distributed:
+            sampler = torch.utils.data.distributed.DistributedSampler(dataset, num_replicas=args.world_size,rank=args.rank)
         else:
+            sampler = None
 
-            if args.rank == 0:
-                print("Loading evaluation dataset : {} {}".format(training_params["evaluation_dataset"], evaluation_split))
+        dataset = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size_eval,
+                shuffle=(not args.distributed), num_workers=args.num_workers,
+                collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
 
-            dataset_eval = evaluation_dataset(training_params["evaluation_dataset_path"], training_params, tokenizer_params, evaluation_split, args)
+        if args.rank == 0:
+            print("Loaded :", dataset.dataset.__len__(), "samples", "/", dataset.__len__(), "batches")
 
-            if args.distributed:
-                sampler = torch.utils.data.distributed.DistributedSampler(dataset_eval, num_replicas=args.world_size,rank=args.rank)
-            else:
-                sampler = None
+        dataset_eval[dataset_name] = dataset
 
-            dataset_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size_eval, shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
+    # # One Evaluation dataset
+    # else:
 
-            if args.rank == 0:
-                print("Loaded :", dataset_eval.dataset.__len__(), "samples", "/", dataset_eval.__len__(), "batches")
-    else:
-        dataset_eval = None
+    #     if args.rank == 0:
+    #         print("Loading evaluation dataset : {} {}".format(training_params["evaluation_dataset"], evaluation_split))
+
+    #     dataset_eval = evaluation_dataset(training_params["evaluation_dataset_path"], training_params, tokenizer_params, evaluation_split, args)
+
+    #     if args.distributed:
+    #         sampler = torch.utils.data.distributed.DistributedSampler(dataset_eval, num_replicas=args.world_size,rank=args.rank)
+    #     else:
+    #         sampler = None
+
+    #     dataset_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size_eval, shuffle=(not args.distributed), num_workers=args.num_workers, collate_fn=collate_fn_pad, sampler=sampler, pin_memory=False)
+
+    #     if args.rank == 0:
+    #         print("Loaded :", dataset_eval.dataset.__len__(), "samples", "/", dataset_eval.__len__(), "batches")
+    # else:
+    #     dataset_eval = None
 
     return dataset_train, dataset_eval

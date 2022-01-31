@@ -47,6 +47,7 @@ from models.activations import (
     Swish,
     Glu
 )
+import pdb
 
 ###############################################################################
 # Audio Preprocessing
@@ -71,7 +72,7 @@ class AudioPreprocessing(nn.Module):
     Shape:
         Input: (batch_size, audio_len)
         Output: (batch_size, n_mels, audio_len // hop_length + 1)
-    
+
     """
 
     def __init__(self, sample_rate, n_fft, win_length_ms, hop_length_ms, n_mels, normalize, mean, std):
@@ -91,11 +92,11 @@ class AudioPreprocessing(nn.Module):
 
         # Mel Scale (B, n_fft // 2 + 1, T // hop_length + 1) -> (B, n_mels, T // hop_length + 1)
         x = self.MelScale(x)
-        
+
         # Energy log, autocast disabled to prevent float16 overflow
         x = (x.float() + 1e-9).log().type(x.dtype)
 
-        # Compute Sequence lengths 
+        # Compute Sequence lengths
         if x_len is not None:
             x_len = torch.div(x_len, self.hop_length, rounding_mode='floor') + 1
 
@@ -137,7 +138,7 @@ class SpecAugment(nn.Module):
 
         # Spec Augment
         if self.spec_augment:
-        
+
             # Frequency Masking
             for _ in range(self.mF):
                 x = torchaudio.transforms.FrequencyMasking(freq_mask_param=self.F, iid_masks=False).forward(x)
@@ -169,7 +170,7 @@ class Conv1dSubsampling(nn.Module):
     Shape:
         Input: (batch_size, in_dim, in_length)
         Output: (batch_size, out_dim, out_length)
-    
+
     """
 
     def __init__(self, num_layers, in_dim, filters, kernel_size, norm, act):
@@ -212,7 +213,7 @@ class Conv2dSubsampling(nn.Module):
     Shape:
         Input: (batch_size, in_dim, in_length)
         Output: (batch_size, out_dim, out_length)
-    
+
     """
 
     def __init__(self, num_layers, filters, kernel_size, norm, act):
@@ -224,7 +225,7 @@ class Conv2dSubsampling(nn.Module):
 
         # Conv 2D Subsampling Layers
         self.layers = nn.ModuleList([nn.Sequential(
-            nn.Conv2d(1 if layer_id == 0 else filters[layer_id - 1], filters[layer_id], kernel_size, stride=2, padding=(kernel_size - 1) // 2), 
+            nn.Conv2d(1 if layer_id == 0 else filters[layer_id - 1], filters[layer_id], kernel_size, stride=2, padding=(kernel_size - 1) // 2),
             nn.BatchNorm2d(filters[layer_id]) if norm == "batch" else nn.LayerNorm(filters[layer_id]) if norm == "layer" else nn.Identity(),
             nn.ReLU() if act == "relu" else Swish() if act == "swish" else nn.Identity()
         ) for layer_id in range(num_layers)])
@@ -262,7 +263,7 @@ class Conv2dPoolSubsampling(nn.Module):
     Shape:
         Input: (batch_size, in_dim, in_length)
         Output: (batch_size, out_dim, out_length)
-    
+
     """
 
     def __init__(self, num_layers, filters, kernel_size, norm, act):
@@ -313,7 +314,7 @@ class VGGSubsampling(nn.Module):
     Shape:
         Input: (batch_size, in_dim, in_length)
         Output: (batch_size, out_dim, out_length)
-    
+
     """
 
     def __init__(self, num_layers, filters, kernel_size, norm, act):
@@ -333,7 +334,7 @@ class VGGSubsampling(nn.Module):
             nn.BatchNorm2d(filters[layer_id]) if norm == "batch" else nn.LayerNorm(filters[layer_id]) if norm == "layer" else nn.Identity(),
             nn.ReLU() if act == "relu" else Swish() if act == "swish" else nn.Identity(),
             # Pooling
-            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)) 
+            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         ) for layer_id in range(num_layers)])
 
     def forward(self, x, x_len):
@@ -352,7 +353,7 @@ class VGGSubsampling(nn.Module):
         # (B, C, D // S, T // S) -> (B,  C * D // S, T // S)
         batch_size, channels, subsampled_dim, subsampled_length = x.size()
         x = x.reshape(batch_size, channels * subsampled_dim, subsampled_length)
-        
+
         return x, x_len
 
 ###############################################################################
@@ -372,7 +373,7 @@ class FeedForwardModule(nn.Module):
 
     Input: (batch size, length, dim_model)
     Output: (batch size, length, dim_model)
-    
+
     """
 
     def __init__(self, dim_model, dim_ffn, Pdrop, act, inner_dropout):
@@ -433,7 +434,7 @@ class MultiHeadSelfAttentionModule(nn.Module):
                 self.mhsa = GroupedRelPosMultiHeadSelfAttention(dim_model, num_heads, causal, max_pos_encoding, group_size)
             else:
                 self.mhsa = GroupedMultiHeadAttention(dim_model, num_heads, group_size)
-        
+
         # Local Multi-Head Self-Attention
         elif kernel_size is not None and stride == 1:
             if relative_pos_enc:
@@ -461,7 +462,7 @@ class MultiHeadSelfAttentionModule(nn.Module):
                 self.mhsa = RelPosMultiHeadSelfAttention(dim_model, num_heads, causal, max_pos_encoding)
             else:
                 self.mhsa = MultiHeadAttention(dim_model, num_heads)
-            
+
         # Dropout
         self.dropout = nn.Dropout(Pdrop)
 
@@ -501,7 +502,7 @@ class ConvolutionModule(nn.Module):
 
     Input: (batch size, input length, dim_model)
     Output: (batch size, output length, dim_expand)
-    
+
     """
 
     def __init__(self, dim_model, dim_expand, kernel_size, Pdrop, stride, padding):
@@ -535,7 +536,7 @@ class ContextNetBlock(nn.Module):
 
         # Conv Layers
         self.conv_layers = nn.Sequential(*[
-            DepthwiseSeparableConv1d(dim_in if layer_id == 0 else dim_out, dim_out, kernel_size, stride if layer_id == num_layers - 1 else 1, causal) 
+            DepthwiseSeparableConv1d(dim_in if layer_id == 0 else dim_out, dim_out, kernel_size, stride if layer_id == num_layers - 1 else 1, causal)
         for layer_id in range(num_layers)])
 
         # SE Module
@@ -563,7 +564,7 @@ class ContextNetBlock(nn.Module):
         if self.residual is not None:
             y = self.act(y + self.residual(x))
 
-        return y  
+        return y
 
 class ContextNetSubsampling(nn.Module):
 
@@ -572,13 +573,13 @@ class ContextNetSubsampling(nn.Module):
 
         # Blocks
         self.blocks = nn.Sequential(*[ContextNetBlock(
-            num_layers=1 if block_id == 0 else 5, 
-            dim_in=n_mels if block_id == 0 else dim_model, 
-            dim_out=dim_model, 
-            kernel_size=kernel_size, 
-            stride=2 if block_id in [3, 7] else 1, 
-            causal=causal, 
-            se_ratio=None if block_id == 0 else 8, 
+            num_layers=1 if block_id == 0 else 5,
+            dim_in=n_mels if block_id == 0 else dim_model,
+            dim_out=dim_model,
+            kernel_size=kernel_size,
+            stride=2 if block_id in [3, 7] else 1,
+            causal=causal,
+            se_ratio=None if block_id == 0 else 8,
             residual=False if block_id == 0 else True,
         ) for block_id in range(8)])
 
@@ -609,7 +610,7 @@ class SqueezeAndExcitationModule(nn.Module):
 
     Input: (batch_size, in_dim, in_length)
     Output: (batch_size, out_dim, out_length)
-    
+
     """
 
     def __init__(self, input_dim, reduction_ratio, inner_act="relu"):

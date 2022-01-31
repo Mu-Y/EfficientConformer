@@ -57,7 +57,7 @@ class LossCTC(nn.Module):
     def forward(self, batch, pred):
 
         # Unpack Batch
-        x, y, x_len, y_len = batch
+        x, y, x_len, y_len, _ = batch
 
         # Unpack Predictions
         outputs_pred, f_len, _ = pred

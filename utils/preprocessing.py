@@ -28,8 +28,8 @@ from speechbrain.dataio.encoder import CTCTextEncoder
 
 def collate_fn_pad(batch):
 
-    # Regular Mode
-    if len(batch[0]) == 2:
+    # Regular Mode, multilingual or monolingual
+    if len(batch[0]) > 1:
 
         # Sorting sequences by lengths
         sorted_batch = sorted(batch, key=lambda x: x[0].shape[1], reverse=True)
@@ -44,7 +44,18 @@ def collate_fn_pad(batch):
         target_lengths = torch.tensor([t.size(0) for t in target],dtype=torch.long)
         target = torch.nn.utils.rnn.pad_sequence(target, batch_first=True, padding_value=0)
 
-        return data, target, data_lengths, target_lengths
+        if len(batch[0]) == 3:
+            # multilingual
+            ## language, int
+            langs = torch.tensor([item[2] for item in sorted_batch])
+            # langs = langs.unsqueeze(1).expand((-1, data.shape[1])).unsqueeze(2)
+            # ## turn int into one-hot
+            # one_hots = torch.zeros(langs.size(0), langs.size(1), 5).zero_()
+            # langs = one_hots.scatter_(2, langs.data, 1)
+            return data, target, data_lengths, target_lengths, langs
+        elif len(batch[0]) == 2:
+            # monolingual
+            return data, target, data_lengths, target_lengths, None
 
     # LM Mode
     elif len(batch[0]) == 1:
